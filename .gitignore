@@ -102,3 +102,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# custome
+.idea/*
+.DS_STORE
+feed.rss
