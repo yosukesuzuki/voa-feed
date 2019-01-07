@@ -1,7 +1,6 @@
 import datetime
 import json
 from pathlib import Path
-import glob
 
 from pyquery import PyQuery as pq
 from pyquery import pyquery
@@ -37,22 +36,24 @@ def main():
         combined += audio_data
     combined.export('episodes/{}.mp3'.format(today_str), format='mp3')
     write_file_gcs('episodes/{}.mp3'.format(today_str))
-    # add length data
     file_size = Path('episodes/{}.mp3'.format(today_str)).stat().st_size
     with open('episodes/{}.json'.format(today_str), 'w') as f:
         f.write(json.dumps({'articles': articles, 'date': today, 'file_size': file_size, 'file_name': today_str}))
     p = init_podcast()
-    for jsonf in sorted(glob.glob('./episodes/*.json'), reverse=True):
-        with open(jsonf) as f:
-            episode_data = json.loads(f.read())
-            p.episodes += [
-                Episode(title="VOA digest of {}".format(episode_data['date']),
-                        media=Media("{}episodes/{}.mp3".format(FEED_URL, episode_data['file_name']),
-                                    int(episode_data['file_size'])),
-                        summary="VOA digest of {}".format(episode_data['date']),
-                        long_summary=generate_long_summary(episode_data['articles']),
-                        )
-            ]
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(FEED_DOMAIN)
+    blobs = bucket.list_blobs()
+    for jsonf in sorted([b.name for b in blobs if 'json' in b.name],reverse=True):
+        blob = bucket.blob(jsonf)
+        episode_data = json.loads(blob.download_as_string())
+        p.episodes += [
+            Episode(title="VOA digest of {}".format(episode_data['date']),
+                    media=Media("{}episodes/{}.mp3".format(FEED_URL, episode_data['file_name']),
+                                int(episode_data['file_size'])),
+                    summary="VOA digest of {}".format(episode_data['date']),
+                    long_summary=generate_long_summary(episode_data['articles']),
+                    )
+        ]
     p.rss_file(FEED_FILE_NAME)
     write_file_gcs(FEED_FILE_NAME)
 
