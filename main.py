@@ -9,8 +9,11 @@ import requests
 from pydub import AudioSegment
 from podgen import Podcast, Episode, Media, Category
 
+from google.cloud import storage
+
 VOA_URL = "https://learningenglish.voanews.com/"
-FEED_URL = "http://voa.snnm.net/"
+FEED_DOMAIN = "voa.snnm.net"
+FEED_URL = "http://{}/".format(FEED_DOMAIN)
 FEED_FILE_NAME = "feed.rss"
 
 
@@ -33,6 +36,7 @@ def main():
         audio_data = AudioSegment.from_mp3('./audios/{}'.format(a['file_name']))
         combined += audio_data
     combined.export('episodes/{}.mp3'.format(today_str), format='mp3')
+    write_file_gcs('episodes/{}.mp3'.format(today_str))
     # add length data
     file_size = Path('episodes/{}.mp3'.format(today_str)).stat().st_size
     with open('episodes/{}.json'.format(today_str), 'w') as f:
@@ -50,6 +54,16 @@ def main():
                         )
             ]
     p.rss_file(FEED_FILE_NAME)
+    write_file_gcs(FEED_FILE_NAME)
+
+
+def write_file_gcs(file_path: str):
+    # save file as a public read object
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(FEED_DOMAIN)
+    blob = bucket.blob(file_path)
+    blob.upload_from_filename(file_path)
+    blob.make_public()
 
 
 def generate_long_summary(articles: list) -> str:
