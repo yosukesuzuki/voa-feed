@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 
@@ -17,7 +17,7 @@ FEED_FILE_NAME = "feed.rss"
 
 
 def main():
-    now = datetime.datetime.now()
+    now = datetime.now()
     today = now.strftime('%m/%d/%Y')
     today_str = now.strftime('%Y%m%d')
     # pyquery generates DOM
@@ -26,7 +26,9 @@ def main():
     articles = get_article_meta(d)
     download_audio_data(articles)
     combined = AudioSegment.empty()
-    for a in articles:
+    for i, a in enumerate(articles):
+        start_point = get_start_point_min_sec(combined.duration_seconds)
+        articles[i]['start_point'] = start_point
         jingle = AudioSegment.from_mp3('jingle.mp3')
         combined += jingle
         audio_data = AudioSegment.from_mp3('./audios/{}'.format(a['file_name']))
@@ -38,7 +40,7 @@ def main():
         f.write(json.dumps({'articles': articles, 'date': today, 'file_size': file_size, 'file_name': today_str}))
     write_file_gcs('episodes/{}.json'.format(today_str))
     p = init_podcast()
-    for episode_data in get_episodes_data():
+    for episode_data in get_episodes():
         p.episodes += [
             Episode(title="VOA digest of {}".format(episode_data['date']),
                     media=Media("{}episodes/{}.mp3".format(FEED_URL, episode_data['file_name']),
@@ -49,6 +51,15 @@ def main():
         ]
     p.rss_file(FEED_FILE_NAME)
     write_file_gcs(FEED_FILE_NAME)
+
+
+def get_start_point_min_sec(seconds):
+    sec = timedelta(seconds=seconds)
+    d = datetime(1, 1, 1) + sec
+    if seconds > 3600:
+        return "{:02d}:{:02d}:{:02d}".format(d.hour, d.minute, d.second)
+    else:
+        return "{:02d}:{:02d}".format(d.minute, d.second)
 
 
 def download_audio_data(articles: list):
@@ -62,7 +73,7 @@ def download_audio_data(articles: list):
             print("{}: file exists".format(a['file_name']))
 
 
-def get_episodes_data() -> list:
+def get_episodes() -> list:
     episodes = []
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(FEED_DOMAIN)
@@ -86,6 +97,8 @@ def write_file_gcs(file_path: str):
 def generate_long_summary(articles: list) -> str:
     long_summary = ""
     for a in articles:
+        if 'start_point' in a:
+            long_summary += "<h2>[{}]</h2>".format(a['start_point'])
         long_summary += "<a href='{}'>{}</a><p>{}</p>--------<br /><br />".format(a['url'], a['title'], a['body'][:200])
     return long_summary
 
