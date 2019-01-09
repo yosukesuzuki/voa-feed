@@ -10,9 +10,9 @@ from podgen import Podcast, Episode, Media, Category
 
 from google.cloud import storage
 
-VOA_URL = "https://learningenglish.voanews.com/"
+VOA_URL = "https://learningenglish.voanews.com"
 FEED_DOMAIN = "voa.snnm.net"
-FEED_URL = "http://{}/".format(FEED_DOMAIN)
+FEED_URL = "https://{}/".format(FEED_DOMAIN)
 FEED_FILE_NAME = "feed.rss"
 
 
@@ -20,18 +20,15 @@ def main():
     now = datetime.datetime.now()
     today = now.strftime('%m/%d/%Y')
     today_str = now.strftime('%Y%m%d')
+    # pyquery generates DOM
     d = pq(VOA_URL)
+    # parse articles data from the DOM
     articles = get_article_meta(d)
-    for a in articles:
-        if Path('audios/{}'.format(a['file_name'])).is_file() is False:
-            print("getting audio file: {}".format(a['file_name']))
-            audio = requests.get(a['media_url'])
-            with open('audios/{}'.format(a['file_name']), 'wb') as f:
-                f.write(audio.content)
-        else:
-            print("{}: file exists".format(a['file_name']))
+    download_audio_data(articles)
     combined = AudioSegment.empty()
     for a in articles:
+        jingle = AudioSegment.from_mp3('jingle.mp3')
+        combined += jingle
         audio_data = AudioSegment.from_mp3('./audios/{}'.format(a['file_name']))
         combined += audio_data
     combined.export('episodes/{}.mp3'.format(today_str), format='mp3')
@@ -39,13 +36,9 @@ def main():
     file_size = Path('episodes/{}.mp3'.format(today_str)).stat().st_size
     with open('episodes/{}.json'.format(today_str), 'w') as f:
         f.write(json.dumps({'articles': articles, 'date': today, 'file_size': file_size, 'file_name': today_str}))
+    write_file_gcs('episodes/{}.json'.format(today_str))
     p = init_podcast()
-    storage_client = storage.Client()
-    bucket = storage_client.get_bucket(FEED_DOMAIN)
-    blobs = bucket.list_blobs()
-    for jsonf in sorted([b.name for b in blobs if 'json' in b.name],reverse=True):
-        blob = bucket.blob(jsonf)
-        episode_data = json.loads(blob.download_as_string())
+    for episode_data in get_episodes_data():
         p.episodes += [
             Episode(title="VOA digest of {}".format(episode_data['date']),
                     media=Media("{}episodes/{}.mp3".format(FEED_URL, episode_data['file_name']),
@@ -56,6 +49,29 @@ def main():
         ]
     p.rss_file(FEED_FILE_NAME)
     write_file_gcs(FEED_FILE_NAME)
+
+
+def download_audio_data(articles: list):
+    for a in articles:
+        if Path('audios/{}'.format(a['file_name'])).is_file() is False:
+            print("getting audio file: {}".format(a['file_name']))
+            audio = requests.get(a['media_url'])
+            with open('audios/{}'.format(a['file_name']), 'wb') as f:
+                f.write(audio.content)
+        else:
+            print("{}: file exists".format(a['file_name']))
+
+
+def get_episodes_data() -> list:
+    episodes = []
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(FEED_DOMAIN)
+    blobs = bucket.list_blobs()
+    for jsonf in sorted([b.name for b in blobs if 'json' in b.name], reverse=True):
+        blob = bucket.blob(jsonf)
+        episode_data = json.loads(blob.download_as_string())
+        episodes.append(episode_data)
+    return episodes
 
 
 def write_file_gcs(file_path: str):
