@@ -7,6 +7,7 @@ from pyquery import pyquery
 import requests
 from pydub import AudioSegment
 from podgen import Podcast, Episode, Media, Category
+from jinja2 import Environment, FileSystemLoader
 
 from google.cloud import storage
 
@@ -39,6 +40,8 @@ def main():
     with open('episodes/{}.json'.format(today_str), 'w') as f:
         f.write(json.dumps({'articles': articles, 'date': today, 'file_size': file_size, 'file_name': today_str}))
     write_file_gcs('episodes/{}.json'.format(today_str))
+    generate_html(today_str)
+    write_file_gcs('htmls/{}.html'.format(today_str))
     p = init_podcast()
     for episode_data in get_episodes():
         p.episodes += [
@@ -51,6 +54,21 @@ def main():
         ]
     p.rss_file(FEED_FILE_NAME)
     write_file_gcs(FEED_FILE_NAME)
+
+
+def generate_html(file_name):
+    env = Environment(loader=FileSystemLoader('templates'))
+    template = env.get_template('episode.html')
+    with open('episodes/{}.json'.format(file_name), 'r') as f:
+        episode_data = json.loads(f.read())
+        title = "VOA digest of {}".format(episode_data['date'])
+        articles = episode_data['articles']
+        for i, a in enumerate(articles):
+            articles[i]['paragraphs'] = a['body'].split('\n')
+        output_from_parsed_template = template.render(title=title, articles=articles)
+    # to save the results
+    with open("htmls/{}.html".format(file_name), "w") as f:
+        f.write(output_from_parsed_template)
 
 
 def get_start_point_min_sec(seconds):

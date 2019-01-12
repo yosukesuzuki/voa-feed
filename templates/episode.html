@@ -5,8 +5,14 @@
     <title>{{ title }}</title>
 </head>
 <body>
+<h1>{{ title }}</h1>
 {% for a in articles %}
-<article></article>
+<article>
+    <h2>{{ a['title'] }}</h2>
+    {% for b in a['paragraphs'] %}
+        <p>{{ b }}</p>
+    {% endfor %}
+</article>
 {% endfor %}
 </body>
 </html>
