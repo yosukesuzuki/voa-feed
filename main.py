@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
+import pytz
 import json
 from pathlib import Path
 
 from pyquery import PyQuery as pq
 from pyquery import pyquery
+
 import requests
 from pydub import AudioSegment
 from podgen import Podcast, Episode, Media, Category
@@ -21,9 +23,7 @@ def main():
     now = datetime.now()
     today = now.strftime('%m/%d/%Y')
     today_str = now.strftime('%Y%m%d')
-    # pyquery generates DOM
     d = pq(VOA_URL)
-    # parse articles data from the DOM
     articles = get_article_meta(d)
     download_audio_data(articles)
     combined = AudioSegment.empty()
@@ -56,6 +56,43 @@ def main():
     write_file_gcs(FEED_FILE_NAME)
 
 
+def sub():
+    feed_file_name = "feed-article.rss"
+    p = Podcast()
+    p.name = "(short articles) VOA pod cast with transcript"
+    p.description = "(short articles) VOA pod cast with full transcript links"
+    p.website = FEED_URL
+    p.language = "en"
+    p.feed_url = "{}{}".format(FEED_URL, feed_file_name)
+    p.category = Category('Education', 'Language Courses')
+    p.explicit = False
+    p.complete = False
+    already_used = []
+    counter = 0
+    for episode_data in get_episodes():
+        for article in episode_data['articles']:
+            if not article['file_name'] in already_used:
+                try:
+                    file_size = Path('audios/{}'.format(article['file_name'])).stat().st_size
+                except FileNotFoundError:
+                    continue
+                p.episodes += [
+                    Episode(title="{}".format(article['title']),
+                            media=Media(article['media_url'].split('?')[0],
+                                        int(file_size)),
+                            summary=article['body'][:200],
+                            long_summary="<br /><br />".join(article['body'].split('\n')),
+                            )
+                ]
+                already_used.append(article['file_name'])
+                counter += 1
+        if counter > 100:
+            break
+    p.rss_file(feed_file_name)
+    write_file_gcs(feed_file_name)
+    sub()
+
+
 def generate_html(file_name):
     env = Environment(loader=FileSystemLoader('templates'))
     template = env.get_template('episode.html')
@@ -64,7 +101,12 @@ def generate_html(file_name):
         title = "VOA digest of {}".format(episode_data['date'])
         articles = episode_data['articles']
         for i, a in enumerate(articles):
-            articles[i]['paragraphs'] = a['body'].split('\n')
+            paragraphs = []
+            for p in a['body'].split('\n'):
+                if p.startswith('_') and p.endswith('_'):
+                    continue
+                paragraphs.append(p)
+            articles[i]['paragraphs'] = paragraphs
         output_from_parsed_template = template.render(title=title, articles=articles)
     # to save the results
     with open("htmls/{}.html".format(file_name), "w") as f:
@@ -96,10 +138,14 @@ def get_episodes() -> list:
     storage_client = storage.Client()
     bucket = storage_client.get_bucket(FEED_DOMAIN)
     blobs = bucket.list_blobs()
+    counter = 0
     for jsonf in sorted([b.name for b in blobs if 'json' in b.name], reverse=True):
         blob = bucket.blob(jsonf)
         episode_data = json.loads(blob.download_as_string())
         episodes.append(episode_data)
+        counter += 1
+        if counter > 30:
+            break
     return episodes
 
 
@@ -153,7 +199,7 @@ def get_article_body(d: pyquery.PyQuery) -> str:
     for e in d('#article-content p'):
         if e.text:
             body_text += e.text
-        elif body_text.endswith('\n') is False:
+        if body_text.endswith('\n') is False:
             body_text += '\n'
     return body_text
 
