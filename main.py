@@ -50,6 +50,7 @@ def main():
                                 int(episode_data['file_size'])),
                     summary="VOA digest of {}".format(episode_data['date']),
                     long_summary=generate_long_summary(episode_data['articles']),
+                    publication_date=datetime.strptime(episode_data['date'], '%m/%d/%Y').astimezone(pytz.utc),
                     )
         ]
     p.rss_file(FEED_FILE_NAME)
@@ -82,6 +83,7 @@ def sub():
                                         int(file_size)),
                             summary=article['body'][:200],
                             long_summary="<br /><br />".join(article['body'].split('\n')),
+                            publication_date=datetime.strptime(article['date'], '%m/%d/%Y'),
                             )
                 ]
                 already_used.append(article['file_name'])
@@ -183,14 +185,17 @@ def init_podcast() -> Podcast:
 def get_article_meta(d: pyquery.PyQuery) -> list:
     articles = []
     for e in d('div[data-area-id=R1_1] li a span.title').items():
-        article_data = dict()
-        article_data['url'] = VOA_URL + e.parents('a').attr['href']
-        article_data['title'] = e[0].text
-        article_d = pq(article_data['url'])
-        article_data['body'] = get_article_body(article_d)
-        article_data['media_url'] = article_d.find('#article-content div.inner ul.subitems li.subitem a').attr('href')
-        article_data['file_name'] = article_data['media_url'].split('/')[-1].split('?')[0]
-        articles.append(article_data)
+        try:
+            article_data = dict()
+            article_data['url'] = VOA_URL + e.parents('a').attr['href']
+            article_data['title'] = e[0].text
+            article_d = pq(article_data['url'])
+            article_data['body'] = get_article_body(article_d)
+            article_data['media_url'] = article_d.find('#article-content div.inner ul.subitems li.subitem a').attr('href')
+            article_data['file_name'] = article_data['media_url'].split('/')[-1].split('?')[0]
+            articles.append(article_data)
+        except AttributeError:
+            continue
     return articles
 
 
