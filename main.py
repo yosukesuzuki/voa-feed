@@ -8,6 +8,7 @@ from pyquery import pyquery
 
 import requests
 from pydub import AudioSegment
+from pydub import exceptions as pydube
 from podgen import Podcast, Episode, Media, Category
 from jinja2 import Environment, FileSystemLoader
 
@@ -28,11 +29,15 @@ def main():
     download_audio_data(articles)
     combined = AudioSegment.empty()
     for i, a in enumerate(articles):
+        try:
+            audio_data = AudioSegment.from_mp3('./audios/{}'.format(a['file_name']))
+        except pydube.CouldntDecodeError:
+            print("failed to load audio data: {}".format(a['file_name']))
+            continue
         start_point = get_start_point_min_sec(combined.duration_seconds)
         articles[i]['start_point'] = start_point
         jingle = AudioSegment.from_mp3('jingle.mp3')
         combined += jingle
-        audio_data = AudioSegment.from_mp3('./audios/{}'.format(a['file_name']))
         combined += audio_data
     combined.export('episodes/{}.mp3'.format(today_str), format='mp3')
     write_file_gcs('episodes/{}.mp3'.format(today_str))
