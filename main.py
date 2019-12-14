@@ -195,6 +195,10 @@ def get_article_meta(d: pyquery.PyQuery) -> list:
             article_data['url'] = VOA_URL + e.parents('a').attr['href']
             article_data['title'] = e[0].text
             article_d = pq(article_data['url'])
+            article_category = article_d.find("div.category a").text()
+            if article_category.lower() == "american stories":
+                print("skipping: {}".format(article_category))
+                continue
             article_data['body'] = get_article_body(article_d)
             article_data['media_url'] = article_d.find('#article-content div.inner ul.subitems li.subitem a').attr('href')
             article_data['file_name'] = article_data['media_url'].split('/')[-1].split('?')[0]
