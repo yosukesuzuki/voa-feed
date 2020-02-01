@@ -11,6 +11,7 @@ from pydub import AudioSegment
 from pydub import exceptions as pydube
 from podgen import Podcast, Episode, Media, Category
 from jinja2 import Environment, FileSystemLoader
+from newspaper import Article
 
 from google.cloud import storage
 
@@ -189,22 +190,18 @@ def init_podcast() -> Podcast:
 
 def get_article_meta(d: pyquery.PyQuery) -> list:
     articles = []
-    for e in d('div[data-area-id=R1_1] li a span.title').items():
-        try:
+    for e in d('div#wrowblock-2465_48.media-block-wrap div.media-block a.img-wrap').items():
             article_data = dict()
-            article_data['url'] = VOA_URL + e.parents('a').attr['href']
-            article_data['title'] = e[0].text
-            article_d = pq(article_data['url'])
-            article_category = article_d.find("div.category a").text()
-            if article_category.lower() == "american stories":
-                print("skipping: {}".format(article_category))
-                continue
-            article_data['body'] = get_article_body(article_d)
+            article_data['url'] = VOA_URL + e.attr['href']
+            article_instance = Article(article_data['url'])
+            article_instance.download()
+            article_instance.parse()
+            article_data['title'] = article_instance.title
+            article_data['body'] = article_instance.text
+            article_d = pq(article_instance.html)
             article_data['media_url'] = article_d.find('#article-content div.inner ul.subitems li.subitem a').attr('href')
             article_data['file_name'] = article_data['media_url'].split('/')[-1].split('?')[0]
             articles.append(article_data)
-        except AttributeError:
-            continue
     return articles
 
 
