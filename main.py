@@ -244,9 +244,12 @@ def get_article_meta(d: pyquery.PyQuery) -> list:
         article_data["media_url"] = article_d.find(
             "#article-content div.inner ul.subitems li.subitem a"
         ).attr("href")
-        article_data["file_name"] = (
-            article_data["media_url"].split("/")[-1].split("?")[0]
-        )
+        try:
+            article_data["file_name"] = (
+                article_data["media_url"].split("/")[-1].split("?")[0]
+            )
+        except AttributeError:
+            continue
         articles.append(article_data)
     return articles
 
