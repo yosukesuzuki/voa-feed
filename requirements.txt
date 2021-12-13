@@ -11,7 +11,7 @@ google-cloud-storage==1.13.2
 google-resumable-media==0.3.2
 googleapis-common-protos==1.5.5
 idna==2.8
-lxml==4.6.3
+lxml==4.6.5
 podgen==1.0.0
 protobuf==3.6.1
 pyasn1==0.4.5
