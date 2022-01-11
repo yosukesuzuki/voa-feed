@@ -13,6 +13,7 @@ from pydub import AudioSegment
 from pydub import exceptions as pydube
 from pyquery import PyQuery as pq
 from pyquery import pyquery
+from lxml import etree
 
 CURRENT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
@@ -236,7 +237,11 @@ def get_article_meta(d: pyquery.PyQuery) -> list:
         article_instance.parse()
         article_data["title"] = article_instance.title
         article_data["body"] = article_instance.text
-        article_d = pq(article_instance.html)
+        try:
+            article_d = pq(article_instance.html)
+        except etree.ParserError:
+            print("skipping: {}, parser error".format(article_instance.title))
+            continue
         article_category = article_d.find("div.category a").text()
         if article_category.lower() == "american stories":
             print("skipping: {}".format(article_category))
