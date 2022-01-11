@@ -11,7 +11,7 @@ google-cloud-storage==1.13.2
 google-resumable-media==0.3.2
 googleapis-common-protos==1.5.5
 idna==2.8
-lxml==4.6.2
+lxml==4.6.3
 podgen==1.0.0
 protobuf==3.6.1
 pyasn1==0.4.5
@@ -21,8 +21,8 @@ pyquery==1.4.0
 python-dateutil==2.7.5
 pytz==2018.7
 requests==2.22.0
-rsa==4.0
+rsa==4.7
 six==1.12.0
 tinytag==1.0.0
-urllib3==1.25.7
+urllib3==1.26.5
 newspaper3k==0.2.8
