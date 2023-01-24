@@ -228,13 +228,16 @@ def init_podcast() -> Podcast:
 def get_article_meta(d: pyquery.PyQuery) -> list:
     articles = []
     for e in d(
-        "div#wrowblock-2465_48.media-block-wrap div.media-block a.img-wrap"
+        "#wrowblock-36256_81 div.media-block a"
     ).items():
         article_data = dict()
         article_data["url"] = VOA_URL + e.attr["href"]
         article_instance = Article(article_data["url"])
         article_instance.download()
-        article_instance.parse()
+        try:
+            article_instance.parse()
+        except:
+            continue
         article_data["title"] = article_instance.title
         article_data["body"] = article_instance.text
         try:
